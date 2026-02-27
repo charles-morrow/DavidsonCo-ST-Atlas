@@ -20,7 +20,7 @@ const store = createStore({
     traffic: true,
     intersections: true,
     transit: true,
-    sidewalks: false,
+    sidewalks: true,
   },
   liveData: {
     countyBoundary: {

@@ -355,13 +355,19 @@ h1 {
 }
 
 .toggle-item {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  align-items: start;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
   border: 1px solid var(--line);
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.56);
+  min-height: 94px;
+}
+
+.toggle-copy {
+  display: grid;
+  gap: 4px;
 }
 
 .toggle-copy strong,
@@ -388,6 +394,7 @@ h1 {
   position: relative;
   cursor: pointer;
   transition: background-color 180ms ease;
+  flex: 0 0 auto;
 }
 
 .switch::after {
