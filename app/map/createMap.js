@@ -249,7 +249,7 @@ export function createSafetyMap({
       map,
       "transit-line",
       "transit",
-      ["coalesce", ["get", "stroke"], "#2a62c9"],
+      "#2a62c9",
       3,
       0.78,
     );
