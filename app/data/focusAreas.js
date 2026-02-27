@@ -91,7 +91,7 @@ const intersectionProjects = [
   {
     id: "fourth-church",
     name: "4th Avenue & Church Street",
-    coordinates: [-86.7803, 36.1635],
+    coordinates: [-86.77874, 36.16401],
     streetHints: [["4th avenue", "4th ave", "4 avenue"], ["church"]],
     emphasis: "Downtown signal and crosswalk location included in NDOT's five-intersection HIN package.",
     modes: ["Walking", "Driving"],
@@ -100,9 +100,9 @@ const intersectionProjects = [
   {
     id: "john-lewis-mlk",
     name: "Rep. John Lewis Way & Dr. Martin Luther King Jr. Blvd",
-    coordinates: [-86.7856, 36.1664],
+    coordinates: [-86.77992, 36.16945],
     streetHints: [
-      ["john lewis", "rep john lewis", "7th avenue", "7th ave"],
+      ["john lewis", "rep john lewis", "5th avenue", "5th ave"],
       ["martin luther king", "martin l king", "mlk"],
     ],
     emphasis: "Major downtown crossing identified for timing, striping, and pedestrian safety upgrades.",
@@ -112,13 +112,15 @@ const intersectionProjects = [
   {
     id: "hillsboro-bandywood",
     name: "Hillsboro Circle & Bandywood Drive",
-    coordinates: [-86.8107, 36.1162],
+    coordinates: [-86.81921, 36.10523],
     streetHints: [["hillsboro circle", "hillsboro pike", "hillsboro"], ["bandywood"]],
     emphasis: "Green Hills area intersection with planned lane, median, sidewalk, and lighting changes.",
     modes: ["Walking", "Driving"],
     source: "NDOT HIN Local Intersection Improvements project page.",
   },
 ];
+
+const MAX_INTERSECTION_SNAP_DISTANCE = 0.0015;
 
 export const officialStreetSegments = localReferenceStreetSegments;
 export const officialIntersectionProjects = intersectionProjects;
@@ -206,13 +208,15 @@ function resolveIntersectionCoordinates(intersection, trafficFeatures) {
 
   if (!intersections.length) {
     const nearestPair = findNearestLinePair(firstRoadLines, secondRoadLines, intersection.coordinates);
-    return nearestPair?.midpoint ?? null;
+    return keepPointNearAnchor(nearestPair?.midpoint, intersection.coordinates);
   }
 
-  return intersections.sort(
+  const resolvedPoint = intersections.sort(
     (left, right) =>
       distanceBetween(left, intersection.coordinates) - distanceBetween(right, intersection.coordinates),
   )[0];
+
+  return keepPointNearAnchor(resolvedPoint, intersection.coordinates);
 }
 
 function normalizeHintGroups(rawHints) {
@@ -410,6 +414,16 @@ function distanceFromPointToLine(point, line) {
 
 function midpoint(left, right) {
   return [(left[0] + right[0]) / 2, (left[1] + right[1]) / 2];
+}
+
+function keepPointNearAnchor(candidate, anchorPoint) {
+  if (!candidate) {
+    return null;
+  }
+
+  return distanceBetween(candidate, anchorPoint) <= MAX_INTERSECTION_SNAP_DISTANCE
+    ? candidate
+    : anchorPoint;
 }
 
 function normalizeStreetLabel(value) {
