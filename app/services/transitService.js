@@ -1,5 +1,6 @@
 import { TRANSIT_PROXY_URL } from "../config.js";
 import { officialStreetSegments } from "../data/focusAreas.js";
+import { staticTransitGeoJson, staticTransitSnapshot } from "../data/generatedTransitSnapshot.js";
 import { constrainCollectionToCounty } from "./geometryService.js";
 
 const transitFallbackGeoJson = {
@@ -23,12 +24,20 @@ const transitFallbackGeoJson = {
 };
 
 export async function fetchTransitGeoJson(routeShortNames, countyFeature) {
+  if (staticTransitGeoJson.features.length && !TRANSIT_PROXY_URL) {
+    return {
+      data: constrainCollectionToCounty(staticTransitGeoJson, countyFeature),
+      mode: "live",
+      detail: buildStaticTransitDetail(),
+    };
+  }
+
   if (!TRANSIT_PROXY_URL) {
     return {
       data: constrainCollectionToCounty(transitFallbackGeoJson, countyFeature),
       mode: "fallback",
       detail:
-        "The browser cannot read WeGo's GTFS zip directly because of CORS, so the app is using county-clipped fallback route sketches. Add a proxy URL to enable live transit geometry.",
+        "The browser cannot read WeGo's GTFS zip directly because of CORS, and no deploy-time GTFS snapshot was available, so the app is using county-clipped fallback route sketches.",
     };
   }
 
@@ -126,6 +135,22 @@ export async function fetchTransitGeoJson(routeShortNames, countyFeature) {
         "The live GTFS feed could not be parsed, so the app used county-clipped route sketches tied to the local reference streets.",
     };
   }
+}
+
+function buildStaticTransitDetail() {
+  const generatedAt = staticTransitSnapshot.generatedAt
+    ? new Date(staticTransitSnapshot.generatedAt).toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      })
+    : null;
+
+  if (!generatedAt) {
+    return "Transit routes came from a deploy-time GTFS snapshot and were clipped to Davidson County.";
+  }
+
+  return `Transit routes came from a deploy-time WeGo GTFS snapshot built on ${generatedAt} and were clipped to Davidson County.`;
 }
 
 async function readZipFile(zip, filename) {

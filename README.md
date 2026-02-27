@@ -41,7 +41,8 @@ Then open `http://localhost:8000`.
 - The Davidson County boundary is intentionally checked in locally so the rest of the overlays stay deterministic across sessions.
 - The intersection markers are still local reference data because the crash-area feed is polygon-based, not a pre-labeled local-street severity dataset.
 - If the live GTFS feed fails, the app falls back to local route sketches so the map still works.
-- WeGo's GTFS zip cannot be read directly from the browser because of CORS. The included `dev-server.mjs` exposes `/api/wego-gtfs` locally so live transit geometry can load during development. On GitHub Pages, the app automatically skips that proxy and uses fallback transit sketches instead.
+- WeGo's GTFS zip cannot be read directly from the browser because of CORS. The included `dev-server.mjs` exposes `/api/wego-gtfs` locally so live transit geometry can load during development.
+- On GitHub Pages, the deployment workflow attempts to fetch WeGo GTFS server-side and writes a static transit snapshot into the published site. If that snapshot build fails, the app falls back to local transit sketches.
 - The sidewalk overlay depends on the browser reaching Nashville's ArcGIS service.
 
 ## Deploy to GitHub Pages
@@ -60,4 +61,5 @@ GitHub will publish the app at:
 Notes:
 
 - The app uses relative asset paths, so it will work from a GitHub Pages repo subpath.
-- Live transit proxying is local-development-only. The public GitHub Pages version will use the fallback transit overlay unless you later move the GTFS proxy to a hosted serverless function.
+- Live transit proxying is still local-development-only, but GitHub Pages deploys now try to publish a build-time GTFS snapshot for the transit overlay.
+- If the workflow cannot fetch or parse WeGo GTFS during deploy, the public GitHub Pages version will fall back to the local transit sketches.

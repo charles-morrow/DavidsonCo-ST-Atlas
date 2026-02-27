@@ -24,6 +24,23 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Fetch WeGo GTFS snapshot
+        id: transit_snapshot
+        continue-on-error: true
+        run: |
+          mkdir -p .cache/gtfs
+          curl -fsSL -L https://www.wegotransit.com/googleexport/google_transit.zip -o /tmp/wego-gtfs.zip
+          unzip -oq /tmp/wego-gtfs.zip -d .cache/gtfs
+
+      - name: Build static transit snapshot
+        if: ${{ steps.transit_snapshot.outcome == 'success' }}
+        run: node scripts/build-static-transit.mjs .cache/gtfs app/data/generatedTransitSnapshot.js
+
       - name: Configure Pages
         uses: actions/configure-pages@v5
         with:
