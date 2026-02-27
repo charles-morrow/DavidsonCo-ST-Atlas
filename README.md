@@ -6,7 +6,7 @@ This is a small static web app for exploring Davidson County, Tennessee travel s
 - Live official NDOT Metro street-network traffic context with on-map street labels
 - Local NDOT intersection improvement markers
 - Optional live sidewalk inventory from Nashville's map service
-- Optional bus route overlays clipped to the county boundary
+- Bus route overlays clipped to the county boundary
 - An analytics tab that summarizes crash exposure and mobility context
 
 ## Run it locally
@@ -42,7 +42,7 @@ Then open `http://localhost:8000`.
 - The intersection markers are still local reference data because the crash-area feed is polygon-based, not a pre-labeled local-street severity dataset.
 - If the live GTFS feed fails, the app falls back to local route sketches so the map still works.
 - WeGo's GTFS zip cannot be read directly from the browser because of CORS. The included `dev-server.mjs` exposes `/api/wego-gtfs` locally so live transit geometry can load during development.
-- On GitHub Pages, the deployment workflow attempts to fetch WeGo GTFS server-side and writes a static transit snapshot into the published site. If that snapshot build fails, the app falls back to local transit sketches.
+- On GitHub Pages, the deployment workflow attempts to fetch the full WeGo GTFS feed server-side and writes a static county-clipped transit snapshot into the published site. If that snapshot build fails, the app falls back to local transit sketches.
 - The sidewalk overlay depends on the browser reaching Nashville's ArcGIS service.
 
 ## Deploy to GitHub Pages

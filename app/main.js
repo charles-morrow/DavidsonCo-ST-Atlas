@@ -1,8 +1,5 @@
-import { SOURCE_LINKS, TRANSIT_INTEREST_ROUTES } from "./config.js";
-import {
-  localReferenceRoutes,
-  officialIntersectionProjects,
-} from "./data/focusAreas.js";
+import { SOURCE_LINKS } from "./config.js";
+import { officialIntersectionProjects } from "./data/focusAreas.js";
 import { createSafetyMap } from "./map/createMap.js?v=20260227b";
 import { fetchSidewalkGeoJson } from "./services/arcgis.js";
 import { fetchOfficialCrashAreas } from "./services/crashService.js";
@@ -12,8 +9,6 @@ import { fetchTransitGeoJson } from "./services/transitService.js";
 import { createStore } from "./state.js";
 import { renderAnalytics } from "./ui/renderAnalytics.js";
 import { renderSidebar } from "./ui/renderSidebar.js";
-
-const routeShortNames = new Set([...TRANSIT_INTEREST_ROUTES, ...localReferenceRoutes]);
 
 const store = createStore({
   activeView: "map",
@@ -301,7 +296,7 @@ async function requestTransit() {
     count: 0,
   });
 
-  const result = await fetchTransitGeoJson(routeShortNames, countyBoundary);
+  const result = await fetchTransitGeoJson(countyBoundary);
   mapApi?.updateTransit(result.data);
   patchLiveData("transit", {
     status: result.mode,

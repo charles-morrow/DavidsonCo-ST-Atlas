@@ -23,7 +23,7 @@ const transitFallbackGeoJson = {
     })),
 };
 
-export async function fetchTransitGeoJson(routeShortNames, countyFeature) {
+export async function fetchTransitGeoJson(countyFeature) {
   if (staticTransitGeoJson.features.length && !TRANSIT_PROXY_URL) {
     return {
       data: constrainCollectionToCounty(staticTransitGeoJson, countyFeature),
@@ -67,16 +67,10 @@ export async function fetchTransitGeoJson(routeShortNames, countyFeature) {
 
     const routes = parseCsv(routesText);
     const trips = parseCsv(tripsText);
-    const selectedRoutes = new Map();
-
-    routes.forEach((route) => {
-      if (routeShortNames.has(route.route_short_name)) {
-        selectedRoutes.set(route.route_id, route);
-      }
-    });
+    const selectedRoutes = new Map(routes.map((route) => [route.route_id, route]));
 
     if (!selectedRoutes.size) {
-      throw new Error("No selected routes were found in the GTFS feed.");
+      throw new Error("No routes were found in the GTFS feed.");
     }
 
     const shapesByRoute = pickRepresentativeShapes(trips, selectedRoutes);

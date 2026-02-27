@@ -1,13 +1,9 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 
-import { TRANSIT_INTEREST_ROUTES } from "../app/config.js";
 import { davidsonCountyBoundary } from "../app/data/davidsonCountyBoundary.js";
 import { constrainCollectionToCounty } from "../app/services/geometryService.js";
-
 const [inputDir = ".cache/gtfs", outputFile = "app/data/generatedTransitSnapshot.js"] = process.argv.slice(2);
-
-const routeShortNames = new Set(TRANSIT_INTEREST_ROUTES);
 
 async function main() {
   const [routesText, tripsText, shapesText] = await Promise.all([
@@ -18,16 +14,10 @@ async function main() {
 
   const routes = parseCsv(routesText);
   const trips = parseCsv(tripsText);
-  const selectedRoutes = new Map();
-
-  routes.forEach((route) => {
-    if (routeShortNames.has(route.route_short_name)) {
-      selectedRoutes.set(route.route_id, route);
-    }
-  });
+  const selectedRoutes = new Map(routes.map((route) => [route.route_id, route]));
 
   if (!selectedRoutes.size) {
-    throw new Error("No selected routes were found in the GTFS snapshot.");
+    throw new Error("No routes were found in the GTFS snapshot.");
   }
 
   const shapesByRoute = pickRepresentativeShapes(trips, selectedRoutes);

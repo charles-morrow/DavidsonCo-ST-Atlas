@@ -16,8 +16,6 @@ export const ARCGIS_ENDPOINTS = {
 
 export const TRANSIT_PROXY_URL = isLocalDevHost() ? "/api/wego-gtfs" : null;
 
-export const TRANSIT_INTEREST_ROUTES = ["3", "7", "22", "23", "29", "52", "55"];
-
 export const SOURCE_LINKS = [
   {
     label: "Davidson County Boundary",
