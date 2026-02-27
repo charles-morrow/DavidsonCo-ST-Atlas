@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Davidson County Safety and Travel Atlas</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Space+Grotesk:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles/main.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Davidson County, Tennessee</p>
+          <h1>Safety and Travel Atlas</h1>
+          <p class="byline">Developed by Charles Morrow for Nashville Moves</p>
+        </div>
+        <p class="topbar-copy">
+          A working view of crash-ranked areas, current bus routes, and intersection projects, all within the context of Davidson County's street network. Please allow 30-60 seconds for map to fully propagate.
+        </p>
+      </header>
+
+      <main class="layout">
+        <aside class="sidebar" id="sidebar"></aside>
+
+        <section class="workspace">
+          <div class="workspace-toolbar">
+            <div class="tabset" role="tablist" aria-label="Application views">
+              <button class="tab-button is-active" data-view="map" role="tab">
+                Map
+              </button>
+              <button class="tab-button" data-view="analytics" role="tab">
+                Analytics
+              </button>
+            </div>
+            <div class="status-strip" id="status-strip"></div>
+          </div>
+
+          <div class="view-panel" id="map-view">
+            <div class="map-frame">
+              <div id="map"></div>
+              <div class="map-legend">
+                <div><span class="legend-line legend-county"></span>Davidson County boundary</div>
+                <div><span class="legend-area legend-crash"></span>Crash-ranked area cell</div>
+                <div><span class="legend-area legend-top-crash"></span>Top crash area highlight</div>
+                <div><span class="legend-line legend-traffic-line"></span>Traffic context street</div>
+                <div><span class="legend-dot legend-intersection"></span>Official intersection</div>
+                <div><span class="legend-line legend-transit"></span>Transit route color</div>
+                <div><span class="legend-line legend-sidewalk"></span>Sidewalk centerline</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="view-panel is-hidden" id="analytics-view">
+            <div id="analytics"></div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script type="module" src="./app/main.js"></script>
+  </body>
+</html>
