@@ -363,7 +363,14 @@ export function createSafetyMap({
 
       const hasIndexes = Array.isArray(featureIndexes) && featureIndexes.length > 0;
       const filter = hasIndexes
-        ? ["in", "featureIndex", ...featureIndexes]
+        ? [
+            "any",
+            ...featureIndexes.map((featureIndex) => [
+              "==",
+              ["get", "featureIndex"],
+              featureIndex,
+            ]),
+          ]
         : ["==", ["get", "featureIndex"], -1];
 
       map.setFilter("crash-areas-top-fill", filter);
