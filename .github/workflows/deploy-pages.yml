@@ -34,12 +34,29 @@ jobs:
         continue-on-error: true
         run: |
           mkdir -p .cache/gtfs
-          curl -fsSL -L https://www.wegotransit.com/googleexport/google_transit.zip -o /tmp/wego-gtfs.zip
+          curl \
+            --fail \
+            --show-error \
+            --silent \
+            --location \
+            --retry 3 \
+            --retry-all-errors \
+            --user-agent "Mozilla/5.0 (GitHub Actions Transit Snapshot)" \
+            https://www.wegotransit.com/googleexport/google_transit.zip \
+            -o /tmp/wego-gtfs.zip
           unzip -oq /tmp/wego-gtfs.zip -d .cache/gtfs
 
       - name: Build static transit snapshot
         if: ${{ steps.transit_snapshot.outcome == 'success' }}
         run: node scripts/build-static-transit.mjs .cache/gtfs app/data/generatedTransitSnapshot.js
+
+      - name: Report transit snapshot status
+        run: |
+          if [ "${{ steps.transit_snapshot.outcome }}" = "success" ]; then
+            echo "Transit snapshot: built from WeGo GTFS during deploy."
+          else
+            echo "Transit snapshot: unavailable, deploy will use fallback transit sketches."
+          fi
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
