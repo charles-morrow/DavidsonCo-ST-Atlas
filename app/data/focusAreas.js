@@ -83,6 +83,7 @@ const intersectionProjects = [
     id: "garfield-delta",
     name: "Garfield Street & Delta Avenue",
     coordinates: [-86.7943, 36.1778],
+    streetHints: ["garfield", "delta"],
     emphasis: "Five-leg North Nashville intersection now under NDOT HIN design review.",
     modes: ["Walking", "Transit", "Driving"],
     source: "NDOT HIN Local Intersection Improvements project page.",
@@ -91,6 +92,7 @@ const intersectionProjects = [
     id: "fourth-church",
     name: "4th Avenue & Church Street",
     coordinates: [-86.7803, 36.1635],
+    streetHints: ["4th avenue", "church"],
     emphasis: "Downtown signal and crosswalk location included in NDOT's five-intersection HIN package.",
     modes: ["Walking", "Driving"],
     source: "NDOT HIN Local Intersection Improvements project page.",
@@ -99,6 +101,7 @@ const intersectionProjects = [
     id: "john-lewis-mlk",
     name: "Rep. John Lewis Way & Dr. Martin Luther King Jr. Blvd",
     coordinates: [-86.7856, 36.1664],
+    streetHints: ["john lewis", "martin luther king"],
     emphasis: "Major downtown crossing identified for timing, striping, and pedestrian safety upgrades.",
     modes: ["Walking", "Driving", "Transit"],
     source: "NDOT HIN Local Intersection Improvements project page.",
@@ -107,6 +110,7 @@ const intersectionProjects = [
     id: "hillsboro-bandywood",
     name: "Hillsboro Circle & Bandywood Drive",
     coordinates: [-86.8107, 36.1162],
+    streetHints: ["hillsboro circle", "bandywood"],
     emphasis: "Green Hills area intersection with planned lane, median, sidewalk, and lighting changes.",
     modes: ["Walking", "Driving"],
     source: "NDOT HIN Local Intersection Improvements project page.",
@@ -140,9 +144,30 @@ export function streetSegmentsToGeoJson() {
 }
 
 export function intersectionsToGeoJson() {
+  return buildIntersectionsGeoJson(officialIntersectionProjects);
+}
+
+export function resolveIntersectionProjectsFromTraffic(trafficCollection) {
+  if (!trafficCollection?.features?.length) {
+    return officialIntersectionProjects;
+  }
+
+  return officialIntersectionProjects.map((intersection) => {
+    const resolvedCoordinates = resolveIntersectionCoordinates(intersection, trafficCollection.features);
+
+    return resolvedCoordinates
+      ? {
+          ...intersection,
+          coordinates: resolvedCoordinates,
+        }
+      : intersection;
+  });
+}
+
+export function buildIntersectionsGeoJson(intersections) {
   return {
     type: "FeatureCollection",
-    features: officialIntersectionProjects.map((intersection) => ({
+    features: intersections.map((intersection) => ({
       type: "Feature",
       properties: {
         id: intersection.id,
@@ -157,4 +182,114 @@ export function intersectionsToGeoJson() {
       },
     })),
   };
+}
+
+function resolveIntersectionCoordinates(intersection, trafficFeatures) {
+  const [firstHint, secondHint] = intersection.streetHints ?? [];
+
+  if (!firstHint || !secondHint) {
+    return null;
+  }
+
+  const firstRoadLines = findMatchingLines(trafficFeatures, firstHint);
+  const secondRoadLines = findMatchingLines(trafficFeatures, secondHint);
+  const intersections = [];
+
+  firstRoadLines.forEach((firstLine) => {
+    secondRoadLines.forEach((secondLine) => {
+      collectLineIntersections(firstLine, secondLine, intersections);
+    });
+  });
+
+  if (!intersections.length) {
+    return null;
+  }
+
+  return intersections.sort(
+    (left, right) =>
+      distanceBetween(left, intersection.coordinates) - distanceBetween(right, intersection.coordinates),
+  )[0];
+}
+
+function findMatchingLines(features, hint) {
+  const normalizedHint = normalizeStreetLabel(hint);
+
+  return features
+    .filter((feature) => {
+      const name = normalizeStreetLabel(feature.properties?.displayName);
+      return name.includes(normalizedHint);
+    })
+    .flatMap((feature) => extractLines(feature.geometry));
+}
+
+function extractLines(geometry) {
+  if (!geometry) {
+    return [];
+  }
+
+  if (geometry.type === "LineString") {
+    return [geometry.coordinates];
+  }
+
+  if (geometry.type === "MultiLineString") {
+    return geometry.coordinates;
+  }
+
+  return [];
+}
+
+function collectLineIntersections(firstLine, secondLine, collector) {
+  for (let firstIndex = 0; firstIndex < firstLine.length - 1; firstIndex += 1) {
+    for (let secondIndex = 0; secondIndex < secondLine.length - 1; secondIndex += 1) {
+      const point = segmentIntersection(
+        firstLine[firstIndex],
+        firstLine[firstIndex + 1],
+        secondLine[secondIndex],
+        secondLine[secondIndex + 1],
+      );
+
+      if (point) {
+        collector.push(point);
+      }
+    }
+  }
+}
+
+function segmentIntersection(startA, endA, startB, endB) {
+  const denominator =
+    (endA[0] - startA[0]) * (endB[1] - startB[1]) - (endA[1] - startA[1]) * (endB[0] - startB[0]);
+
+  if (Math.abs(denominator) < 1e-10) {
+    return null;
+  }
+
+  const numeratorA =
+    (startA[1] - startB[1]) * (endB[0] - startB[0]) - (startA[0] - startB[0]) * (endB[1] - startB[1]);
+  const numeratorB =
+    (startA[1] - startB[1]) * (endA[0] - startA[0]) - (startA[0] - startB[0]) * (endA[1] - startA[1]);
+  const ratioA = numeratorA / denominator;
+  const ratioB = numeratorB / denominator;
+
+  if (ratioA < 0 || ratioA > 1 || ratioB < 0 || ratioB > 1) {
+    return null;
+  }
+
+  return [
+    startA[0] + ratioA * (endA[0] - startA[0]),
+    startA[1] + ratioA * (endA[1] - startA[1]),
+  ];
+}
+
+function normalizeStreetLabel(value) {
+  return String(value ?? "")
+    .toLowerCase()
+    .replace(/[.&]/g, " ")
+    .replace(/\bjr\b/g, "jr")
+    .replace(/\bdr\b/g, "dr")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function distanceBetween(left, right) {
+  return Math.hypot(left[0] - right[0], left[1] - right[1]);
 }

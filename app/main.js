@@ -1,5 +1,9 @@
 import { SOURCE_LINKS } from "./config.js";
-import { officialIntersectionProjects } from "./data/focusAreas.js";
+import {
+  buildIntersectionsGeoJson,
+  officialIntersectionProjects,
+  resolveIntersectionProjectsFromTraffic,
+} from "./data/focusAreas.js";
 import { createSafetyMap } from "./map/createMap.js?v=20260227b";
 import { fetchSidewalkGeoJson } from "./services/arcgis.js";
 import { fetchOfficialCrashAreas } from "./services/crashService.js";
@@ -267,6 +271,9 @@ async function requestTraffic() {
   try {
     const result = await fetchTrafficCounts(countyBoundary);
     mapApi?.updateTraffic(result.data);
+    mapApi?.updateIntersections(
+      buildIntersectionsGeoJson(resolveIntersectionProjectsFromTraffic(result.data)),
+    );
     patchLiveData("traffic", {
       status: result.mode,
       detail: result.detail,

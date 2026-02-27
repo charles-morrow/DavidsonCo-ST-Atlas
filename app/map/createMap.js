@@ -1,7 +1,4 @@
-import {
-  officialIntersectionProjects,
-  intersectionsToGeoJson,
-} from "../data/focusAreas.js";
+import { intersectionsToGeoJson } from "../data/focusAreas.js";
 import { MAP_CENTER, MAP_ZOOM } from "../config.js";
 
 const EMPTY_COLLECTION = {
@@ -52,6 +49,7 @@ export function createSafetyMap({
   map.addControl(new window.maplibregl.NavigationControl(), "top-right");
 
   const pending = {
+    intersections: intersectionsToGeoJson(),
     countyBoundary: EMPTY_COLLECTION,
     countyMask: EMPTY_COLLECTION,
     crashAreas: EMPTY_COLLECTION,
@@ -62,7 +60,7 @@ export function createSafetyMap({
   };
 
   map.on("load", () => {
-    map.addSource("intersections", { type: "geojson", data: intersectionsToGeoJson() });
+    map.addSource("intersections", { type: "geojson", data: pending.intersections });
     map.addSource("county-boundary", { type: "geojson", data: pending.countyBoundary });
     map.addSource("county-mask", { type: "geojson", data: pending.countyMask });
     map.addSource("crash-areas", { type: "geojson", data: pending.crashAreas });
@@ -350,6 +348,10 @@ export function createSafetyMap({
       updateSourceData(map, "county-boundary", outlineData);
       updateSourceData(map, "county-mask", pending.countyMask);
     },
+    updateIntersections(data) {
+      pending.intersections = data;
+      updateSourceData(map, "intersections", data);
+    },
     updateCrashAreas(data) {
       pending.crashAreas = data;
       updateSourceData(map, "crash-areas", data);
@@ -405,14 +407,16 @@ export function createSafetyMap({
       ]);
     },
     focusIntersection(intersectionId) {
-      const intersection = officialIntersectionProjects.find((entry) => entry.id === intersectionId);
+      const intersection = pending.intersections.features.find(
+        (feature) => feature.properties.id === intersectionId,
+      );
 
       if (!intersection) {
         return;
       }
 
       map.flyTo({
-        center: intersection.coordinates,
+        center: intersection.geometry.coordinates,
         zoom: 14.1,
         duration: 850,
       });
