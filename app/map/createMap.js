@@ -24,7 +24,6 @@ export function createSafetyMap({
     container: containerId,
     style: {
       version: 8,
-      glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
       sources: {
         base: {
           type: "raster",
@@ -246,24 +245,6 @@ export function createSafetyMap({
         "line-join": "round",
       },
     });
-    map.addLayer({
-      id: "traffic-labels",
-      type: "symbol",
-      source: "traffic",
-      minzoom: 12.5,
-      layout: {
-        "symbol-placement": "line",
-        "text-field": ["coalesce", ["get", "displayName"], ""],
-        "text-size": 11,
-        "text-letter-spacing": 0.02,
-        "text-font": ["Open Sans Regular"],
-      },
-      paint: {
-        "text-color": "#7a3929",
-        "text-halo-color": "rgba(255, 249, 240, 0.92)",
-        "text-halo-width": 1.4,
-      },
-    });
     addLineLayer(
       map,
       "transit-line",
@@ -382,7 +363,7 @@ export function createSafetyMap({
 
       const hasIndexes = Array.isArray(featureIndexes) && featureIndexes.length > 0;
       const filter = hasIndexes
-        ? ["match", ["get", "featureIndex"], ["literal", featureIndexes], true, false]
+        ? ["in", "featureIndex", ...featureIndexes]
         : ["==", ["get", "featureIndex"], -1];
 
       map.setFilter("crash-areas-top-fill", filter);
@@ -461,7 +442,6 @@ export function createSafetyMap({
       setVisibility(map, "crash-areas-highlight", layers.crashAreas);
       setVisibility(map, "traffic-circles", layers.traffic);
       setVisibility(map, "traffic-lines", layers.traffic);
-      setVisibility(map, "traffic-labels", layers.traffic);
       setVisibility(map, "transit-line", layers.transit);
       setVisibility(map, "sidewalks-line", layers.sidewalks);
       setVisibility(map, "intersections-circle", layers.intersections);
