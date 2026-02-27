@@ -83,7 +83,7 @@ const intersectionProjects = [
     id: "garfield-delta",
     name: "Garfield Street & Delta Avenue",
     coordinates: [-86.7943, 36.1778],
-    streetHints: ["garfield", "delta"],
+    streetHints: [["garfield"], ["delta"]],
     emphasis: "Five-leg North Nashville intersection now under NDOT HIN design review.",
     modes: ["Walking", "Transit", "Driving"],
     source: "NDOT HIN Local Intersection Improvements project page.",
@@ -92,7 +92,7 @@ const intersectionProjects = [
     id: "fourth-church",
     name: "4th Avenue & Church Street",
     coordinates: [-86.7803, 36.1635],
-    streetHints: ["4th avenue", "church"],
+    streetHints: [["4th avenue", "4th ave", "4 avenue"], ["church"]],
     emphasis: "Downtown signal and crosswalk location included in NDOT's five-intersection HIN package.",
     modes: ["Walking", "Driving"],
     source: "NDOT HIN Local Intersection Improvements project page.",
@@ -101,7 +101,10 @@ const intersectionProjects = [
     id: "john-lewis-mlk",
     name: "Rep. John Lewis Way & Dr. Martin Luther King Jr. Blvd",
     coordinates: [-86.7856, 36.1664],
-    streetHints: ["john lewis", "martin luther king"],
+    streetHints: [
+      ["john lewis", "rep john lewis", "7th avenue", "7th ave"],
+      ["martin luther king", "martin l king", "mlk"],
+    ],
     emphasis: "Major downtown crossing identified for timing, striping, and pedestrian safety upgrades.",
     modes: ["Walking", "Driving", "Transit"],
     source: "NDOT HIN Local Intersection Improvements project page.",
@@ -110,7 +113,7 @@ const intersectionProjects = [
     id: "hillsboro-bandywood",
     name: "Hillsboro Circle & Bandywood Drive",
     coordinates: [-86.8107, 36.1162],
-    streetHints: ["hillsboro circle", "bandywood"],
+    streetHints: [["hillsboro circle", "hillsboro pike", "hillsboro"], ["bandywood"]],
     emphasis: "Green Hills area intersection with planned lane, median, sidewalk, and lighting changes.",
     modes: ["Walking", "Driving"],
     source: "NDOT HIN Local Intersection Improvements project page.",
@@ -185,24 +188,25 @@ export function buildIntersectionsGeoJson(intersections) {
 }
 
 function resolveIntersectionCoordinates(intersection, trafficFeatures) {
-  const [firstHint, secondHint] = intersection.streetHints ?? [];
+  const [firstHints, secondHints] = normalizeHintGroups(intersection.streetHints ?? []);
 
-  if (!firstHint || !secondHint) {
+  if (!firstHints.length || !secondHints.length) {
     return null;
   }
 
-  const firstRoadLines = findMatchingLines(trafficFeatures, firstHint);
-  const secondRoadLines = findMatchingLines(trafficFeatures, secondHint);
+  const firstRoadLines = findMatchingLines(trafficFeatures, firstHints, intersection.coordinates);
+  const secondRoadLines = findMatchingLines(trafficFeatures, secondHints, intersection.coordinates);
   const intersections = [];
 
   firstRoadLines.forEach((firstLine) => {
     secondRoadLines.forEach((secondLine) => {
-      collectLineIntersections(firstLine, secondLine, intersections);
+      collectLineIntersections(firstLine.coordinates, secondLine.coordinates, intersections);
     });
   });
 
   if (!intersections.length) {
-    return null;
+    const nearestPair = findNearestLinePair(firstRoadLines, secondRoadLines, intersection.coordinates);
+    return nearestPair?.midpoint ?? null;
   }
 
   return intersections.sort(
@@ -211,15 +215,26 @@ function resolveIntersectionCoordinates(intersection, trafficFeatures) {
   )[0];
 }
 
-function findMatchingLines(features, hint) {
-  const normalizedHint = normalizeStreetLabel(hint);
+function normalizeHintGroups(rawHints) {
+  return rawHints.map((entry) => (Array.isArray(entry) ? entry : [entry]));
+}
+
+function findMatchingLines(features, hints, anchorPoint) {
+  const normalizedHints = hints.map((hint) => normalizeStreetLabel(hint));
 
   return features
     .filter((feature) => {
       const name = normalizeStreetLabel(feature.properties?.displayName);
-      return name.includes(normalizedHint);
+      return normalizedHints.some((hint) => name.includes(hint));
     })
-    .flatMap((feature) => extractLines(feature.geometry));
+    .flatMap((feature) =>
+      extractLines(feature.geometry).map((coordinates) => ({
+        coordinates,
+        distanceToAnchor: distanceFromPointToLine(anchorPoint, coordinates),
+      })),
+    )
+    .sort((left, right) => left.distanceToAnchor - right.distanceToAnchor)
+    .slice(0, 6);
 }
 
 function extractLines(geometry) {
@@ -255,6 +270,61 @@ function collectLineIntersections(firstLine, secondLine, collector) {
   }
 }
 
+function findNearestLinePair(firstRoadLines, secondRoadLines, anchorPoint) {
+  let bestPair = null;
+
+  firstRoadLines.forEach((firstLine) => {
+    secondRoadLines.forEach((secondLine) => {
+      const candidate = findNearestPointPair(firstLine.coordinates, secondLine.coordinates);
+
+      if (!candidate) {
+        return;
+      }
+
+      const anchorDistance = distanceBetween(candidate.midpoint, anchorPoint);
+
+      if (
+        !bestPair ||
+        candidate.distance < bestPair.distance ||
+        (Math.abs(candidate.distance - bestPair.distance) < 1e-10 &&
+          anchorDistance < bestPair.anchorDistance)
+      ) {
+        bestPair = {
+          ...candidate,
+          anchorDistance,
+        };
+      }
+    });
+  });
+
+  return bestPair;
+}
+
+function findNearestPointPair(firstLine, secondLine) {
+  let bestPair = null;
+
+  for (let firstIndex = 0; firstIndex < firstLine.length - 1; firstIndex += 1) {
+    for (let secondIndex = 0; secondIndex < secondLine.length - 1; secondIndex += 1) {
+      const candidate = closestPointsBetweenSegments(
+        firstLine[firstIndex],
+        firstLine[firstIndex + 1],
+        secondLine[secondIndex],
+        secondLine[secondIndex + 1],
+      );
+
+      if (!candidate) {
+        continue;
+      }
+
+      if (!bestPair || candidate.distance < bestPair.distance) {
+        bestPair = candidate;
+      }
+    }
+  }
+
+  return bestPair;
+}
+
 function segmentIntersection(startA, endA, startB, endB) {
   const denominator =
     (endA[0] - startA[0]) * (endB[1] - startB[1]) - (endA[1] - startA[1]) * (endB[0] - startB[0]);
@@ -278,6 +348,68 @@ function segmentIntersection(startA, endA, startB, endB) {
     startA[0] + ratioA * (endA[0] - startA[0]),
     startA[1] + ratioA * (endA[1] - startA[1]),
   ];
+}
+
+function closestPointsBetweenSegments(startA, endA, startB, endB) {
+  const exactIntersection = segmentIntersection(startA, endA, startB, endB);
+
+  if (exactIntersection) {
+    return {
+      distance: 0,
+      midpoint: exactIntersection,
+    };
+  }
+
+  const candidates = [
+    projectPointToSegment(startA, startB, endB),
+    projectPointToSegment(endA, startB, endB),
+    projectPointToSegment(startB, startA, endA),
+    projectPointToSegment(endB, startA, endA),
+  ];
+
+  return candidates
+    .map((candidate) => ({
+      distance: distanceBetween(candidate.point, candidate.projectedPoint),
+      midpoint: midpoint(candidate.point, candidate.projectedPoint),
+    }))
+    .sort((left, right) => left.distance - right.distance)[0];
+}
+
+function projectPointToSegment(point, start, end) {
+  const deltaX = end[0] - start[0];
+  const deltaY = end[1] - start[1];
+  const lengthSquared = deltaX * deltaX + deltaY * deltaY;
+
+  if (lengthSquared === 0) {
+    return {
+      point,
+      projectedPoint: start,
+    };
+  }
+
+  const rawRatio =
+    ((point[0] - start[0]) * deltaX + (point[1] - start[1]) * deltaY) / lengthSquared;
+  const ratio = Math.max(0, Math.min(1, rawRatio));
+
+  return {
+    point,
+    projectedPoint: [start[0] + ratio * deltaX, start[1] + ratio * deltaY],
+  };
+}
+
+function distanceFromPointToLine(point, line) {
+  let bestDistance = Number.POSITIVE_INFINITY;
+
+  for (let index = 0; index < line.length - 1; index += 1) {
+    const candidate = projectPointToSegment(point, line[index], line[index + 1]);
+    bestDistance = Math.min(bestDistance, distanceBetween(point, candidate.projectedPoint));
+  }
+
+  return bestDistance;
+}
+
+function midpoint(left, right) {
+  return [(left[0] + right[0]) / 2, (left[1] + right[1]) / 2];
 }
 
 function normalizeStreetLabel(value) {
