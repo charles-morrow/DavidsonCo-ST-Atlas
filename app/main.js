@@ -3,7 +3,7 @@ import {
   localReferenceRoutes,
   officialIntersectionProjects,
 } from "./data/focusAreas.js";
-import { createSafetyMap } from "./map/createMap.js";
+import { createSafetyMap } from "./map/createMap.js?v=20260227b";
 import { fetchSidewalkGeoJson } from "./services/arcgis.js";
 import { fetchOfficialCrashAreas } from "./services/crashService.js";
 import { fetchDavidsonCountyBoundary } from "./services/countyService.js";
