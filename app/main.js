@@ -1,13 +1,21 @@
 import { SOURCE_LINKS } from "./config.js";
-import {
-  buildIntersectionsGeoJson,
-  officialIntersectionProjects,
-  resolveIntersectionProjectsFromTraffic,
-} from "./data/focusAreas.js";
-import { createSafetyMap } from "./map/createMap.js?v=20260227b";
+import { officialIntersectionDefinitions } from "./data/intersectionRegistry.js";
+import { createSafetyMap } from "./map/createMap.js?v=20260228b";
 import { fetchSidewalkGeoJson } from "./services/arcgis.js";
 import { fetchOfficialCrashAreas } from "./services/crashService.js";
 import { fetchDavidsonCountyBoundary } from "./services/countyService.js";
+import {
+  buildIntersectionGeoJson,
+  buildUnresolvedIntersectionSeed,
+  EMPTY_COLLECTION,
+  resolveIntersectionProjects,
+} from "./services/intersectionResolver.js";
+import {
+  buildLiveDataFromSnapshot,
+  hasAtlasSnapshot,
+  loadAtlasSnapshot,
+  shouldPreferLiveData,
+} from "./services/snapshotService.js";
 import { fetchTrafficCounts } from "./services/trafficService.js";
 import { fetchTransitGeoJson } from "./services/transitService.js";
 import { createStore } from "./state.js";
@@ -19,6 +27,7 @@ const store = createStore({
   selectedIntersectionId: null,
   selectedCrashAreaIndex: null,
   countyBoundaryReady: false,
+  intersectionProjects: buildUnresolvedIntersectionSeed(officialIntersectionDefinitions),
   layers: {
     crashAreas: true,
     traffic: true,
@@ -41,6 +50,12 @@ const store = createStore({
     traffic: {
       status: "idle",
       detail: "Traffic counts have not loaded yet.",
+      count: 0,
+      summary: null,
+    },
+    intersections: {
+      status: "idle",
+      detail: "Official intersections are waiting on NDOT street geometry.",
       count: 0,
       summary: null,
     },
@@ -70,6 +85,7 @@ let crashAreasRequested = false;
 let trafficRequested = false;
 let transitRequested = false;
 let sidewalkRequested = false;
+let atlasSnapshotLoaded = false;
 
 const mapApi = createSafetyMap({
   containerId: "map",
@@ -94,6 +110,10 @@ const actions = {
     }
 
     if (layerKey === "traffic" && nextLayers.traffic) {
+      requestTraffic();
+    }
+
+    if (layerKey === "intersections" && nextLayers.intersections) {
       requestTraffic();
     }
 
@@ -171,6 +191,14 @@ async function bootstrapLiveData() {
     return;
   }
 
+  if (!shouldPreferLiveData()) {
+    const snapshotApplied = await tryAtlasSnapshot();
+
+    if (snapshotApplied) {
+      return;
+    }
+  }
+
   await Promise.allSettled([
     requestCrashAreas(),
     requestTraffic(),
@@ -222,8 +250,48 @@ async function ensureCountyBoundary() {
   return countyBoundary;
 }
 
+async function tryAtlasSnapshot() {
+  try {
+    const snapshot = await loadAtlasSnapshot();
+
+    if (!hasAtlasSnapshot(snapshot)) {
+      return false;
+    }
+
+    const prepared = buildLiveDataFromSnapshot(snapshot);
+    atlasSnapshotLoaded = true;
+    crashAreasRequested = true;
+    trafficRequested = true;
+    transitRequested = true;
+    sidewalkRequested = true;
+
+    mapApi?.updateCrashAreas(prepared.layers.crashAreas);
+    mapApi?.updateTraffic(prepared.layers.traffic);
+    mapApi?.updateIntersections(prepared.layers.intersections);
+    mapApi?.updateTransit(prepared.layers.transit);
+    mapApi?.updateSidewalks(prepared.layers.sidewalks);
+
+    store.patch({
+      intersectionProjects: prepared.intersectionProjects,
+      liveData: {
+        ...store.getState().liveData,
+        crashAreas: prepared.liveData.crashAreas,
+        traffic: prepared.liveData.traffic,
+        intersections: prepared.liveData.intersections,
+        sidewalks: prepared.liveData.sidewalks,
+        transit: prepared.liveData.transit,
+      },
+    });
+
+    return true;
+  } catch (error) {
+    console.warn(error);
+    return false;
+  }
+}
+
 async function requestCrashAreas() {
-  if (crashAreasRequested || !countyBoundary) {
+  if (crashAreasRequested || atlasSnapshotLoaded || !countyBoundary) {
     return;
   }
 
@@ -256,7 +324,7 @@ async function requestCrashAreas() {
 }
 
 async function requestTraffic() {
-  if (trafficRequested || !countyBoundary) {
+  if (trafficRequested || atlasSnapshotLoaded || !countyBoundary) {
     return;
   }
 
@@ -267,24 +335,50 @@ async function requestTraffic() {
     count: 0,
     summary: null,
   });
+  patchLiveData("intersections", {
+    status: "loading",
+    detail: "Official intersections are resolving against NDOT street geometry.",
+    count: 0,
+    summary: null,
+  });
 
   try {
     const result = await fetchTrafficCounts(countyBoundary);
-    mapApi?.updateTraffic(result.data);
-    mapApi?.updateIntersections(
-      buildIntersectionsGeoJson(resolveIntersectionProjectsFromTraffic(result.data)),
+    const intersectionResult = resolveIntersectionProjects(
+      officialIntersectionDefinitions,
+      result.data,
     );
+
+    mapApi?.updateTraffic(result.data);
+    mapApi?.updateIntersections(buildIntersectionGeoJson(intersectionResult.projects));
+    store.patch({ intersectionProjects: intersectionResult.projects });
     patchLiveData("traffic", {
       status: result.mode,
       detail: result.detail,
       count: result.summary.totalStations,
       summary: result.summary,
     });
+    patchLiveData("intersections", {
+      status: buildIntersectionStatus(intersectionResult.summary),
+      detail: buildIntersectionDetail(intersectionResult),
+      count: intersectionResult.summary.resolvedCount,
+      summary: intersectionResult.summary,
+    });
   } catch (error) {
     console.warn(error);
+    store.patch({
+      intersectionProjects: buildUnresolvedIntersectionSeed(officialIntersectionDefinitions),
+    });
+    mapApi?.updateIntersections(EMPTY_COLLECTION);
     patchLiveData("traffic", {
       status: "error",
       detail: "The traffic count service did not load in this session.",
+      count: 0,
+      summary: null,
+    });
+    patchLiveData("intersections", {
+      status: "error",
+      detail: "Official intersections are unavailable because NDOT street geometry did not load.",
       count: 0,
       summary: null,
     });
@@ -292,7 +386,7 @@ async function requestTraffic() {
 }
 
 async function requestTransit() {
-  if (transitRequested || !countyBoundary) {
+  if (transitRequested || atlasSnapshotLoaded || !countyBoundary) {
     return;
   }
 
@@ -313,7 +407,7 @@ async function requestTransit() {
 }
 
 async function requestSidewalks() {
-  if (sidewalkRequested || !countyBoundary) {
+  if (sidewalkRequested || atlasSnapshotLoaded || !countyBoundary) {
     return;
   }
 
@@ -405,6 +499,7 @@ function buildSidebarModel(state) {
       { label: "County filter", value: formatStatus(state.liveData.countyBoundary.status) },
       { label: "Crash areas", value: displayCount(state.liveData.crashAreas) },
       { label: "Traffic context", value: displayCount(state.liveData.traffic) },
+      { label: "Resolved intersections", value: displayCount(state.liveData.intersections) },
       { label: "Sidewalk segments", value: displayCount(state.liveData.sidewalks) },
     ],
     statusDetails: buildStatusDetails(state),
@@ -412,17 +507,23 @@ function buildSidebarModel(state) {
       state.liveData.countyBoundary.detail,
       state.liveData.crashAreas.detail,
       state.liveData.traffic.detail,
+      state.liveData.intersections.detail,
       state.liveData.transit.detail,
       state.liveData.sidewalks.detail,
     ]
       .filter(Boolean)
       .join(" "),
-    intersections: officialIntersectionProjects
-      .filter((intersection) => !/brick church pike/i.test(intersection.name))
-      .map((intersection) => ({
-        ...intersection,
-        selected: intersection.id === state.selectedIntersectionId,
-      })),
+    intersections: state.intersectionProjects.map((intersection) => ({
+      ...intersection,
+      selected: intersection.resolved && intersection.id === state.selectedIntersectionId,
+      interactive: intersection.resolved,
+      statusLabel: intersection.resolved
+        ? "resolved from NDOT street geometry"
+        : intersection.resolutionType === "pending"
+          ? "waiting on NDOT street geometry"
+          : "unresolved",
+      resolutionLabel: formatResolutionType(intersection.resolutionType),
+    })),
     crashAreas:
       crashSummary?.topAreas.map((area) => ({
         id: area.featureIndex,
@@ -445,7 +546,10 @@ function buildAnalyticsModel(state) {
       { value: state.liveData.countyBoundary.status === "error" ? "no" : "yes", label: "all live layers county-confined" },
       { value: crashSummary?.totalAreas ?? displayCount(state.liveData.crashAreas), label: "local crash areas loaded" },
       { value: trafficSummary?.totalStations ?? displayCount(state.liveData.traffic), label: "local traffic context segments" },
-      { value: officialIntersectionProjects.filter((intersection) => !/brick church pike/i.test(intersection.name)).length, label: "metro-jurisdiction intersections" },
+      {
+        value: formatIntersectionMetric(state.liveData.intersections.summary),
+        label: "official intersections resolved",
+      },
     ],
     corridorBars: topCrashAreas.map((area) => ({
       name: area.name,
@@ -469,6 +573,11 @@ function buildAnalyticsModel(state) {
         value: `${state.liveData.traffic.count} segments`,
       },
       {
+        label: "Intersection resolver",
+        detail: state.liveData.intersections.detail,
+        value: formatStatus(state.liveData.intersections.status),
+      },
+      {
         label: "Transit overlay",
         detail: state.liveData.transit.detail,
         value: `${state.liveData.transit.count} lines`,
@@ -479,12 +588,16 @@ function buildAnalyticsModel(state) {
         value: `${state.liveData.sidewalks.count} segments`,
       },
     ],
-    intersectionRows: officialIntersectionProjects
-      .filter((intersection) => !/brick church pike/i.test(intersection.name))
-      .map((intersection) => ({
+    intersectionRows: state.intersectionProjects.map((intersection) => ({
         name: intersection.name,
         detail: intersection.emphasis,
         modes: intersection.modes.join(" / "),
+        statusLabel: intersection.resolved
+          ? "resolved"
+          : intersection.resolutionType === "pending"
+            ? "pending"
+            : "unresolved",
+        resolutionLabel: formatResolutionType(intersection.resolutionType),
       })),
     narrative: buildNarrative(topCrashAreas, state),
   };
@@ -496,7 +609,9 @@ function buildNarrative(topCrashAreas, state) {
   }
 
   const trafficMode =
-    "The traffic overlay is currently using NDOT's local street network as the official traffic context layer.";
+    state.liveData.traffic.status === "snapshot"
+      ? "The traffic overlay is currently using a deploy-time NDOT county snapshot."
+      : "The traffic overlay is currently using NDOT's local street network as the official traffic context layer.";
 
   return `${topCrashAreas[0].name} is currently leading the county-filtered crash view. ${trafficMode} State highways and federal interstates are intentionally excluded from the traffic and crash overlays so the map stays focused on Davidson County jurisdiction.`;
 }
@@ -506,6 +621,7 @@ function buildStatusDetails(state) {
     createStatusDetail("County boundary", state.liveData.countyBoundary.status),
     createStatusDetail("Crash areas", state.liveData.crashAreas.status),
     createStatusDetail("Traffic", state.liveData.traffic.status),
+    createStatusDetail("Intersections", state.liveData.intersections.status),
     createStatusDetail("Transit", state.liveData.transit.status),
     createStatusDetail("Sidewalks", state.liveData.sidewalks.status),
   ];
@@ -518,6 +634,10 @@ function createStatusDetail(label, status) {
     className:
       status === "live" || status === "local"
         ? "is-live"
+        : status === "snapshot"
+          ? "is-snapshot"
+        : status === "partial"
+          ? "is-partial"
         : status === "fallback"
           ? "is-fallback"
           : status === "error"
@@ -536,6 +656,9 @@ function renderStatusStrip(root, state) {
     </span>
     <span class="status-chip ${createStatusDetail("Traffic", state.liveData.traffic.status).className}">
       Traffic ${formatStatus(state.liveData.traffic.status)}
+    </span>
+    <span class="status-chip ${createStatusDetail("Intersections", state.liveData.intersections.status).className}">
+      Intersections ${formatStatus(state.liveData.intersections.status)}
     </span>
     <span class="status-chip ${createStatusDetail("Transit", state.liveData.transit.status).className}">
       Transit ${formatStatus(state.liveData.transit.status)}
@@ -556,6 +679,56 @@ function displayCount(item) {
   }
 
   return item.count;
+}
+
+function buildIntersectionStatus(summary) {
+  if (!summary) {
+    return "idle";
+  }
+
+  if (summary.resolvedCount === summary.totalCount) {
+    return "live";
+  }
+
+  return summary.resolvedCount > 0 ? "partial" : "error";
+}
+
+function buildIntersectionDetail(result) {
+  const { resolvedCount, totalCount, unresolvedNames } = result.summary;
+
+  if (resolvedCount === totalCount) {
+    return `All ${totalCount} official intersection projects resolved from NDOT street geometry.`;
+  }
+
+  if (!resolvedCount) {
+    return "The loaded NDOT street geometry did not resolve any official intersection projects confidently.";
+  }
+
+  return `${resolvedCount} of ${totalCount} official intersection projects resolved from NDOT street geometry. Unresolved: ${unresolvedNames.join(", ")}.`;
+}
+
+function formatIntersectionMetric(summary) {
+  if (!summary) {
+    return "pending";
+  }
+
+  return `${summary.resolvedCount}/${summary.totalCount}`;
+}
+
+function formatResolutionType(resolutionType) {
+  if (resolutionType === "shared-node") {
+    return "shared node";
+  }
+
+  if (resolutionType === "nearest-approach") {
+    return "nearest approach";
+  }
+
+  if (resolutionType === "pending") {
+    return "pending";
+  }
+
+  return "unresolved";
 }
 
 function normalizeScore(score, crashSummary) {

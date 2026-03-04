@@ -79,11 +79,17 @@ export function renderSidebar(root, model, actions) {
           .map(
             (intersection) => `
               <button
-                class="list-card ${intersection.selected ? "is-selected" : ""}"
+                class="list-card ${intersection.selected ? "is-selected" : ""} ${intersection.interactive ? "" : "is-muted"}"
                 data-intersection-id="${intersection.id}"
+                ${intersection.interactive ? "" : "disabled"}
               >
                 <strong>${intersection.name}</strong>
                 <span>${intersection.emphasis}</span>
+                <div class="chip-row">
+                  <span class="status-chip ${intersection.resolved ? "is-live" : intersection.statusLabel === "waiting on NDOT street geometry" ? "" : "is-partial"}">${intersection.statusLabel}</span>
+                  <span class="chip">${intersection.resolutionLabel}</span>
+                </div>
+                <span>${intersection.resolutionSummary}</span>
               </button>
             `,
           )

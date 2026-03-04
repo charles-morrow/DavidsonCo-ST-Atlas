@@ -1,17 +1,45 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { davidsonCountyBoundary } from "../app/data/davidsonCountyBoundary.js";
 import { constrainCollectionToCounty } from "../app/services/geometryService.js";
+
 const [inputDir = ".cache/gtfs", outputFile = "app/data/generatedTransitSnapshot.js"] = process.argv.slice(2);
 
 async function main() {
+  const { snapshot, collection: clippedCollection } = await buildTransitSnapshotFromGtfsDirectory(inputDir);
+
+  const moduleContents = [
+    `export const staticTransitSnapshot = ${JSON.stringify(snapshot, null, 2)};`,
+    `export const staticTransitGeoJson = ${JSON.stringify(clippedCollection, null, 2)};`,
+    "",
+  ].join("\n\n");
+
+  await fs.writeFile(outputFile, moduleContents, "utf8");
+}
+
+export async function buildTransitSnapshotFromGtfsDirectory(inputDir) {
   const [routesText, tripsText, shapesText] = await Promise.all([
     fs.readFile(path.join(inputDir, "routes.txt"), "utf8"),
     fs.readFile(path.join(inputDir, "trips.txt"), "utf8"),
     fs.readFile(path.join(inputDir, "shapes.txt"), "utf8"),
   ]);
 
+  const collection = buildTransitCollection(routesText, tripsText, shapesText);
+  const clippedCollection = constrainCollectionToCounty(collection, davidsonCountyBoundary);
+
+  return {
+    snapshot: {
+      generatedAt: new Date().toISOString(),
+      routeCount: clippedCollection.features.length,
+      source: "WeGo GTFS snapshot generated during deploy.",
+    },
+    collection: clippedCollection,
+  };
+}
+
+export function buildTransitCollection(routesText, tripsText, shapesText) {
   const routes = parseCsv(routesText);
   const trips = parseCsv(tripsText);
   const selectedRoutes = new Map(routes.map((route) => [route.route_id, route]));
@@ -49,27 +77,10 @@ async function main() {
     });
   });
 
-  const clippedCollection = constrainCollectionToCounty(
-    {
-      type: "FeatureCollection",
-      features,
-    },
-    davidsonCountyBoundary,
-  );
-
-  const snapshot = {
-    generatedAt: new Date().toISOString(),
-    routeCount: clippedCollection.features.length,
-    source: "WeGo GTFS snapshot generated during deploy.",
+  return {
+    type: "FeatureCollection",
+    features,
   };
-
-  const moduleContents = [
-    `export const staticTransitSnapshot = ${JSON.stringify(snapshot, null, 2)};`,
-    `export const staticTransitGeoJson = ${JSON.stringify(clippedCollection, null, 2)};`,
-    "",
-  ].join("\n\n");
-
-  await fs.writeFile(outputFile, moduleContents, "utf8");
 }
 
 function pickRepresentativeShapes(trips, selectedRoutes) {
@@ -199,7 +210,9 @@ function normalizeColor(routeColor) {
   return routeColor.startsWith("#") ? routeColor : `#${routeColor}`;
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exitCode = 1;
-});
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  main().catch((error) => {
+    console.error(error);
+    process.exitCode = 1;
+  });
+}

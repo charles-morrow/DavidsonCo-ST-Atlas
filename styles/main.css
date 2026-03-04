@@ -458,6 +458,20 @@ h1 {
   border-color: rgba(21, 48, 59, 0.28);
 }
 
+.list-card:disabled,
+.list-card.is-muted {
+  cursor: default;
+  opacity: 0.82;
+}
+
+.list-card:disabled:hover,
+.list-card:disabled:focus-visible,
+.list-card.is-muted:hover,
+.list-card.is-muted:focus-visible {
+  transform: none;
+  border-color: var(--line);
+}
+
 .list-card.is-selected {
   border-color: rgba(197, 93, 61, 0.42);
   box-shadow: 0 10px 24px rgba(197, 93, 61, 0.14);
@@ -495,7 +509,17 @@ h1 {
   color: var(--teal);
 }
 
+.status-chip.is-snapshot {
+  background: rgba(42, 98, 201, 0.12);
+  color: var(--transit-route);
+}
+
 .status-chip.is-fallback {
+  background: rgba(217, 164, 65, 0.18);
+  color: #8a651a;
+}
+
+.status-chip.is-partial {
   background: rgba(217, 164, 65, 0.18);
   color: #8a651a;
 }
@@ -551,6 +575,18 @@ h1 {
 .table-row:last-child {
   padding-bottom: 0;
   border-bottom: 0;
+}
+
+.table-row-meta {
+  display: grid;
+  justify-items: end;
+  gap: 3px;
+  text-align: right;
+}
+
+.table-row-meta span {
+  color: var(--muted);
+  font-size: 0.82rem;
 }
 
 .link-list {

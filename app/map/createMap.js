@@ -1,4 +1,3 @@
-import { intersectionsToGeoJson } from "../data/focusAreas.js";
 import { MAP_CENTER, MAP_ZOOM } from "../config.js";
 
 const EMPTY_COLLECTION = {
@@ -49,7 +48,7 @@ export function createSafetyMap({
   map.addControl(new window.maplibregl.NavigationControl(), "top-right");
 
   const pending = {
-    intersections: intersectionsToGeoJson(),
+    intersections: EMPTY_COLLECTION,
     countyBoundary: EMPTY_COLLECTION,
     countyMask: EMPTY_COLLECTION,
     crashAreas: EMPTY_COLLECTION,
@@ -584,12 +583,21 @@ function showPopup(map, lngLat, html) {
 }
 
 function intersectionPopup(properties) {
+  const distanceLine =
+    properties.resolutionDistanceFeet == null
+      ? ""
+      : `<li>Resolution distance: ${properties.resolutionDistanceFeet} ft</li>`;
+
   return `
     <div class="popup-card">
       <h3>${properties.name}</h3>
       <p>${properties.emphasis}</p>
       <ul>
         <li>Modes under pressure: ${properties.modes}</li>
+        <li>Resolution: ${formatResolutionType(properties.resolutionType)}</li>
+        <li>Confidence: ${properties.confidence}</li>
+        <li>Geometry source: ${properties.geometrySource}</li>
+        ${distanceLine}
       </ul>
     </div>
   `;
@@ -682,4 +690,16 @@ function flattenCoordinates(geometry) {
   }
 
   return [];
+}
+
+function formatResolutionType(value) {
+  if (value === "shared-node") {
+    return "shared node";
+  }
+
+  if (value === "nearest-approach") {
+    return "nearest approach";
+  }
+
+  return value ?? "unresolved";
 }

@@ -1,0 +1,156 @@
+export const officialIntersectionDefinitions = [
+  {
+    id: "garfield-delta",
+    name: "Garfield Avenue & Delta Avenue",
+    source: "NDOT HIN Local Intersection Improvements project page.",
+    emphasis: "Five-leg North Nashville intersection now under NDOT HIN design review.",
+    modes: ["Walking", "Transit", "Driving"],
+    ndotProjectKey: "hin-local-intersection-improvements",
+    streetA: {
+      canonicalName: "GARFIELD AVE",
+      aliases: ["GARFIELD AVENUE"],
+      preferredDirection: null,
+    },
+    streetB: {
+      canonicalName: "DELTA AVE",
+      aliases: ["DELTA AVENUE"],
+      preferredDirection: null,
+    },
+    matchRules: {
+      maxNodeDistanceFeet: 120,
+      requireSharedNodeOrNearestApproach: true,
+      preferStreetSegmentsNearestArea: true,
+    },
+    fallbackStrategy: "hide-if-unresolved",
+    validation: {
+      expectedArea: "north-nashville",
+    },
+  },
+  {
+    id: "fourth-church",
+    name: "4th Avenue & Church Street",
+    source: "NDOT HIN Local Intersection Improvements project page.",
+    emphasis: "Downtown signal and crosswalk location included in NDOT's five-intersection HIN package.",
+    modes: ["Walking", "Driving"],
+    ndotProjectKey: "hin-local-intersection-improvements",
+    streetA: {
+      canonicalName: "4TH AVE N",
+      aliases: ["4TH AVE", "4TH AVENUE", "4TH AVENUE NORTH"],
+      preferredDirection: "N",
+    },
+    streetB: {
+      canonicalName: "CHURCH ST",
+      aliases: ["CHURCH STREET"],
+      preferredDirection: null,
+    },
+    matchRules: {
+      maxNodeDistanceFeet: 140,
+      requireSharedNodeOrNearestApproach: true,
+      preferStreetSegmentsNearestArea: true,
+    },
+    fallbackStrategy: "hide-if-unresolved",
+    validation: {
+      expectedArea: "downtown",
+    },
+  },
+  {
+    id: "john-lewis-mlk",
+    name: "Rep. John Lewis Way & Dr. Martin Luther King Jr. Blvd",
+    source: "NDOT HIN Local Intersection Improvements project page.",
+    emphasis: "Major downtown crossing identified for timing, striping, and pedestrian safety upgrades.",
+    modes: ["Walking", "Driving", "Transit"],
+    ndotProjectKey: "hin-local-intersection-improvements",
+    streetA: {
+      canonicalName: "REP. JOHN LEWIS WAY NORTH",
+      aliases: [
+        "REP JOHN LEWIS WAY",
+        "REP JOHN LEWIS WAY S",
+        "JOHN LEWIS WAY",
+        "REP JOHN LEWIS WAY N",
+        "JOHN LEWIS WAY S",
+        "5TH AVE N",
+        "5TH AVE S",
+        "5TH AVE",
+        "REP JOHN LEWIS"
+      ],
+      preferredDirection: null,
+    },
+    streetB: {
+      canonicalName: "DR. MARTIN L. KING, JR. BOULEVARD",
+      aliases: [
+        "DR. MARTIN L. KING, JR. BLVD",
+        "MARTIN LUTHER KING JR BLVD",
+        "DR MARTIN L KING JR BLVD",
+        "MARTIN L KING JR BLVD",
+        "DR MARTIN L KING JR",
+        "DR MLK JR BLVD",
+        "MLK JR BLVD",
+        "MLK BLVD",
+      ],
+      preferredDirection: null,
+    },
+    matchRules: {
+      maxNodeDistanceFeet: 260,
+      requireSharedNodeOrNearestApproach: true,
+      preferStreetSegmentsNearestArea: true,
+    },
+    fallbackStrategy: "hide-if-unresolved",
+    validation: {
+      expectedArea: "downtown-north",
+    },
+  },
+  {
+    id: "hillsboro-bandywood",
+    name: "Hillsboro Circle & Bandywood Drive",
+    source: "NDOT HIN Local Intersection Improvements project page.",
+    emphasis: "Green Hills area intersection with planned lane, median, sidewalk, and lighting changes.",
+    modes: ["Walking", "Driving"],
+    ndotProjectKey: "hin-local-intersection-improvements",
+    streetA: {
+      canonicalName: "HILLSBORO CIR",
+      aliases: ["HILLSBORO CIRCLE", "HILLSBORO PIKE", "HILLSBORO PK"],
+      preferredDirection: null,
+    },
+    streetB: {
+      canonicalName: "BANDYWOOD DR",
+      aliases: ["BANDYWOOD DRIVE"],
+      preferredDirection: null,
+    },
+    matchRules: {
+      maxNodeDistanceFeet: 180,
+      requireSharedNodeOrNearestApproach: true,
+      preferStreetSegmentsNearestArea: true,
+    },
+    fallbackStrategy: "hide-if-unresolved",
+    validation: {
+      expectedArea: "green-hills",
+    },
+  },
+  {
+    id: "brick-church-ewing",
+    name: "Brick Church Pike & Ewing Drive",
+    source: "NDOT HIN Local Intersection Improvements project page.",
+    emphasis: "North corridor intersection included in NDOT's local HIN intersection package.",
+    modes: ["Walking", "Driving", "Transit"],
+    ndotProjectKey: "hin-local-intersection-improvements",
+    streetA: {
+      canonicalName: "BRICK CHURCH PIKE",
+      aliases: ["BRICK CHURCH PK", "BRICK CHURCH"],
+      preferredDirection: null,
+    },
+    streetB: {
+      canonicalName: "EWING DR",
+      aliases: ["EWING DRIVE"],
+      preferredDirection: null,
+    },
+    matchRules: {
+      maxNodeDistanceFeet: 180,
+      requireSharedNodeOrNearestApproach: true,
+      preferStreetSegmentsNearestArea: true,
+    },
+    fallbackStrategy: "hide-if-unresolved",
+    validation: {
+      expectedArea: "brick-church",
+    },
+  },
+];

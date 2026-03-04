@@ -4,6 +4,8 @@ on:
   push:
     branches: ["main"]
   workflow_dispatch:
+  schedule:
+    - cron: "0 10 * * *"
 
 permissions:
   contents: read
@@ -46,16 +48,16 @@ jobs:
             -o /tmp/wego-gtfs.zip
           unzip -oq /tmp/wego-gtfs.zip -d .cache/gtfs
 
-      - name: Build static transit snapshot
-        if: ${{ steps.transit_snapshot.outcome == 'success' }}
-        run: node scripts/build-static-transit.mjs .cache/gtfs app/data/generatedTransitSnapshot.js
+      - name: Build atlas snapshot
+        id: atlas_snapshot
+        run: node scripts/build-atlas-snapshot.mjs .cache/gtfs app/data/generatedAtlasSnapshot.js
 
-      - name: Report transit snapshot status
+      - name: Report snapshot status
         run: |
-          if [ "${{ steps.transit_snapshot.outcome }}" = "success" ]; then
-            echo "Transit snapshot: built from WeGo GTFS during deploy."
+          if [ "${{ steps.atlas_snapshot.outcome }}" = "success" ]; then
+            echo "Atlas snapshot: built during deploy."
           else
-            echo "Transit snapshot: unavailable, deploy will use fallback transit sketches."
+            echo "Atlas snapshot: unavailable, deploy will use live browser data."
           fi
 
       - name: Configure Pages

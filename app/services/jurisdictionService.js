@@ -6,7 +6,6 @@ const EXCLUDED_ROUTE_PATTERNS = [
   /\bSR-?\s?\d+/i,
   /\bState Route\b/i,
   /\bTN-?\s?\d+/i,
-  /\bPike\b/i,
   /\bBriley\b/i,
   /\bParkway\b/i,
   /\bHwy\b/i,

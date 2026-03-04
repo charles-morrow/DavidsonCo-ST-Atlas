@@ -2,6 +2,7 @@ import { ARCGIS_ENDPOINTS } from "../config.js";
 import { arcgisToGeoJson, buildEnvelopeQueryGeometry, fetchArcGisFeatures } from "./arcgisHelpers.js";
 import { constrainCollectionToCounty } from "./geometryService.js";
 import { isMetroJurisdictionLabel, pickFirstMatchingProperty } from "./jurisdictionService.js";
+import { normalizeStreetLabel } from "./intersectionResolver.js";
 
 export async function fetchTrafficCounts(countyFeature) {
   const features = await fetchArcGisFeatures({
@@ -12,7 +13,7 @@ export async function fetchTrafficCounts(countyFeature) {
   });
   const geoJson = constrainCollectionToCounty(arcgisToGeoJson(features), countyFeature);
   const normalizedFeatures = geoJson.features
-    .map((feature, index) => normalizeFallbackStreetFeature(feature, countyFeature, index))
+    .map((feature, index) => normalizeStreetFeature(feature, index))
     .filter(Boolean);
 
   return {
@@ -27,7 +28,7 @@ export async function fetchTrafficCounts(countyFeature) {
   };
 }
 
-function normalizeFallbackStreetFeature(feature, countyFeature, index) {
+function normalizeStreetFeature(feature, index) {
   if (!["LineString", "MultiLineString"].includes(feature.geometry.type)) {
     return null;
   }
@@ -46,16 +47,45 @@ function normalizeFallbackStreetFeature(feature, countyFeature, index) {
     return null;
   }
 
+  const normalizedStreetName = normalizeStreetLabel(label);
+  const sourceObjectId =
+    feature.properties?.OBJECTID ??
+    feature.properties?.ObjectId ??
+    feature.properties?.OBJECTID_1 ??
+    feature.properties?.featureIndex ??
+    index + 1;
+
   return {
     ...feature,
     properties: {
       ...feature.properties,
       featureIndex: index + 1,
+      sourceObjectId,
       displayName: label || `Metro street ${index + 1}`,
+      normalizedStreetName,
+      matchStreetNames: buildStreetNameVariants(label),
       displayCount: null,
       sourceType: "live",
     },
   };
+}
+
+function buildStreetNameVariants(label) {
+  const normalized = normalizeStreetLabel(label);
+
+  return Array.from(
+    new Set([
+      normalized,
+      normalized.replace(/\s+[NSEW]$/, "").trim(),
+      normalized.replace(/\bAVE\b/g, "AVENUE"),
+      normalized.replace(/\bBLVD\b/g, "BOULEVARD"),
+      normalized.replace(/\bCIR\b/g, "CIRCLE"),
+      normalized.replace(/\bDR\b/g, "DRIVE"),
+      normalized.replace(/\bST\b/g, "STREET"),
+      normalized.replace(/\bPIKE\b/g, "PK"),
+      normalized.replace(/\bPK\b/g, "PIKE"),
+    ]),
+  ).map((name) => normalizeStreetLabel(name));
 }
 
 function buildTrafficSummary(features) {

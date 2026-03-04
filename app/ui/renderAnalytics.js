@@ -65,8 +65,12 @@ export function renderAnalytics(root, model) {
                     <div>
                       <strong>${row.name}</strong>
                       <span>${row.detail}</span>
+                      <span>${row.resolutionLabel}</span>
                     </div>
-                    <strong>${row.modes}</strong>
+                    <div class="table-row-meta">
+                      <strong>${row.statusLabel}</strong>
+                      <span>${row.modes}</span>
+                    </div>
                   </div>
                 `,
               )
