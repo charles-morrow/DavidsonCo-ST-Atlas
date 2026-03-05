@@ -7,6 +7,10 @@ export async function fetchSidewalkGeoJson(countyFeature) {
     endpoint: ARCGIS_ENDPOINTS.sidewalks,
     geometry: buildEnvelopeQueryGeometry(countyFeature),
     geometryType: "esriGeometryEnvelope",
+    resultRecordCount: 1000,
+    requestTimeoutMs: 30000,
+    requestRetries: 5,
+    requestRetryDelayMs: 550,
     extraParams: {
       maxAllowableOffset: "0.00012",
     },

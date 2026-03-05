@@ -7,6 +7,9 @@ export async function fetchArcGisFeatures({
   inSpatialReference = "4326",
   outSpatialReference = "4326",
   resultRecordCount = 2000,
+  requestTimeoutMs = 25000,
+  requestRetries = 4,
+  requestRetryDelayMs = 450,
   extraParams = {},
 }) {
   const features = [];
@@ -32,7 +35,12 @@ export async function fetchArcGisFeatures({
       searchParams.set("spatialRel", spatialRelationship);
     }
 
-    const response = await fetch(`${endpoint}?${searchParams.toString()}`);
+    const requestUrl = `${endpoint}?${searchParams.toString()}`;
+    const response = await fetchWithRetry(requestUrl, {
+      timeoutMs: requestTimeoutMs,
+      retries: requestRetries,
+      retryDelayMs: requestRetryDelayMs,
+    });
 
     if (!response.ok) {
       throw new Error(`ArcGIS request failed with ${response.status}`);
@@ -50,6 +58,66 @@ export async function fetchArcGisFeatures({
   }
 
   return features;
+}
+
+async function fetchWithRetry(url, { timeoutMs, retries, retryDelayMs }) {
+  let lastError = null;
+
+  for (let attempt = 0; attempt <= retries; attempt += 1) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      const response = await fetch(url, {
+        signal: controller.signal,
+        headers: buildArcGisRequestHeaders(),
+      });
+
+      clearTimeout(timeout);
+
+      if (response.ok) {
+        return response;
+      }
+
+      if (!shouldRetryResponse(response.status) || attempt === retries) {
+        return response;
+      }
+    } catch (error) {
+      clearTimeout(timeout);
+      lastError = error;
+
+      if (attempt === retries) {
+        throw error;
+      }
+    }
+
+    await sleep(retryDelayMs * (attempt + 1));
+  }
+
+  throw lastError ?? new Error("ArcGIS request failed without a response.");
+}
+
+function shouldRetryResponse(status) {
+  return status === 408 || status === 429 || (status >= 500 && status <= 599);
+}
+
+function buildArcGisRequestHeaders() {
+  if (typeof window !== "undefined") {
+    return {
+      Accept: "application/json",
+    };
+  }
+
+  return {
+    Accept: "application/json",
+    "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+  };
+}
+
+function sleep(durationMs) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, durationMs);
+  });
 }
 
 export function arcgisToGeoJson(features) {
