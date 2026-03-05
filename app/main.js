@@ -85,7 +85,6 @@ let crashAreasRequested = false;
 let trafficRequested = false;
 let transitRequested = false;
 let sidewalkRequested = false;
-let atlasSnapshotLoaded = false;
 
 const mapApi = createSafetyMap({
   containerId: "map",
@@ -192,11 +191,7 @@ async function bootstrapLiveData() {
   }
 
   if (!shouldPreferLiveData()) {
-    const snapshotApplied = await tryAtlasSnapshot();
-
-    if (snapshotApplied) {
-      return;
-    }
+    await tryAtlasSnapshot();
   }
 
   await Promise.allSettled([
@@ -259,11 +254,10 @@ async function tryAtlasSnapshot() {
     }
 
     const prepared = buildLiveDataFromSnapshot(snapshot);
-    atlasSnapshotLoaded = true;
-    crashAreasRequested = true;
-    trafficRequested = true;
-    transitRequested = true;
-    sidewalkRequested = true;
+    crashAreasRequested = isSnapshotLayerReady(prepared.liveData.crashAreas);
+    trafficRequested = isSnapshotLayerReady(prepared.liveData.traffic);
+    transitRequested = isSnapshotLayerReady(prepared.liveData.transit);
+    sidewalkRequested = isSnapshotLayerReady(prepared.liveData.sidewalks);
 
     mapApi?.updateCrashAreas(prepared.layers.crashAreas);
     mapApi?.updateTraffic(prepared.layers.traffic);
@@ -291,7 +285,7 @@ async function tryAtlasSnapshot() {
 }
 
 async function requestCrashAreas() {
-  if (crashAreasRequested || atlasSnapshotLoaded || !countyBoundary) {
+  if (crashAreasRequested || !countyBoundary) {
     return;
   }
 
@@ -324,7 +318,7 @@ async function requestCrashAreas() {
 }
 
 async function requestTraffic() {
-  if (trafficRequested || atlasSnapshotLoaded || !countyBoundary) {
+  if (trafficRequested || !countyBoundary) {
     return;
   }
 
@@ -386,7 +380,7 @@ async function requestTraffic() {
 }
 
 async function requestTransit() {
-  if (transitRequested || atlasSnapshotLoaded || !countyBoundary) {
+  if (transitRequested || !countyBoundary) {
     return;
   }
 
@@ -407,7 +401,7 @@ async function requestTransit() {
 }
 
 async function requestSidewalks() {
-  if (sidewalkRequested || atlasSnapshotLoaded || !countyBoundary) {
+  if (sidewalkRequested || !countyBoundary) {
     return;
   }
 
@@ -443,6 +437,11 @@ function patchLiveData(key, nextValue) {
       [key]: nextValue,
     },
   });
+}
+
+function isSnapshotLayerReady(layerState) {
+  const status = layerState?.status ?? "idle";
+  return !["idle", "loading", "error"].includes(status);
 }
 
 function buildSidebarModel(state) {
